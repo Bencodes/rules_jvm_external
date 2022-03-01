@@ -186,7 +186,10 @@ def _generate_imports(repository_ctx, dep_tree, explicit_artifacts, neverlink_ar
             # 		":org_hamcrest_hamcrest_core",
             # 	],
             #
-            target_import_string.append("\tdeps = [")
+            if import_rule == "jvm_import":
+                target_import_string.append("\texports = [")
+            else:
+                target_import_string.append("\tdeps = [")
 
             # Dedupe dependencies here. Sometimes coursier will return "x.y:z:aar:version" and "x.y:z:version" in the
             # same list of dependencies.

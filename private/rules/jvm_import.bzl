@@ -62,6 +62,11 @@ def _jvm_import_impl(ctx):
                 for dep in ctx.attr.deps
                 if JavaInfo in dep
             ],
+            exports = [
+                export[JavaInfo]
+                for export in ctx.attr.exports
+                if JavaInfo in export
+            ],
             neverlink = ctx.attr.neverlink,
         ),
     ]
@@ -79,6 +84,10 @@ jvm_import = rule(
             cfg = "target",
         ),
         "deps": attr.label_list(
+            default = [],
+            providers = [JavaInfo],
+        ),
+        "exports": attr.label_list(
             default = [],
             providers = [JavaInfo],
         ),
