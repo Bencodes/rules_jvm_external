@@ -46,6 +46,7 @@ load("@compatibility_proxy//:proxy.bzl", "java_binary", "java_library", "java_pl
 load("@rules_jvm_external//private/rules:pin_dependencies.bzl", "pin_dependencies")
 load("@rules_jvm_external//private/rules:jvm_import.bzl", "jvm_import")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+{rules_license_import_statement}
 {aar_import_statement}
 
 {imports}
@@ -298,6 +299,12 @@ def _get_aar_import_statement_or_empty_str(repository_ctx):
         # parse the label to validate it
         _ = Label(repository_ctx.attr.aar_import_bzl_label)
         return _AAR_IMPORT_STATEMENT % repository_ctx.attr.aar_import_bzl_label
+    else:
+        return ""
+
+def _get_rules_license_import_statement_or_empty_str(repository_ctx):
+    if repository_ctx.attr.license_json:
+        return "load(\"@rules_license//rules:license.bzl\", \"license\")"
     else:
         return ""
 
@@ -791,6 +798,18 @@ def _pinned_coursier_fetch_impl(repository_ctx):
         executable = False,
     )
 
+    license_info = {}
+    if repository_ctx.attr.license_json:
+        repository_ctx.symlink(
+            repository_ctx.path(repository_ctx.attr.license_json),
+            repository_ctx.path("imported_license_info.json"),
+        )
+        license_info = json.decode(
+            repository_ctx.read(
+                repository_ctx.path("imported_license_info.json"),
+            ),
+        )
+
     repository_ctx.report_progress("Generating BUILD targets..")
     (generated_imports, jar_versionless_target_labels) = parser.generate_imports(
         repository_ctx = repository_ctx,
@@ -819,6 +838,7 @@ def _pinned_coursier_fetch_impl(repository_ctx):
         override_targets = repository_ctx.attr.override_targets,
         override_target_visibilities = repository_ctx.attr.override_target_visibilities,
         skip_maven_local_dependencies = False,
+        license_info = license_info,
     )
 
     repository_ctx.template(
@@ -842,6 +862,7 @@ def _pinned_coursier_fetch_impl(repository_ctx):
             imports = generated_imports,
             aar_import_statement = _get_aar_import_statement_or_empty_str(repository_ctx),
             unpinned_pin_target = unpinned_pin_target,
+            rules_license_import_statement = _get_rules_license_import_statement_or_empty_str(repository_ctx),
         ) + pin_target,
         executable = False,
     )
@@ -1499,6 +1520,18 @@ def _coursier_fetch_impl(repository_ctx):
         ),
     )
 
+    license_info = {}
+    if repository_ctx.attr.license_json:
+        repository_ctx.symlink(
+            repository_ctx.path(repository_ctx.attr.license_json),
+            repository_ctx.path("imported_license_info.json"),
+        )
+        license_info = json.decode(
+            repository_ctx.read(
+                repository_ctx.path("imported_license_info.json"),
+            ),
+        )
+
     repository_ctx.report_progress("Generating BUILD targets..")
     (generated_imports, jar_versionless_target_labels) = parser.generate_imports(
         repository_ctx = repository_ctx,
@@ -1528,6 +1561,7 @@ def _coursier_fetch_impl(repository_ctx):
         override_target_visibilities = repository_ctx.attr.override_target_visibilities,
         # Skip maven local dependencies if generating the unpinned repository
         skip_maven_local_dependencies = _is_unpinned(repository_ctx),
+        license_info = license_info,
     )
 
     # This repository rule can be either in the pinned or unpinned state, depending on when
@@ -1553,6 +1587,7 @@ def _coursier_fetch_impl(repository_ctx):
             repository_name = repository_name,
             imports = generated_imports,
             aar_import_statement = _get_aar_import_statement_or_empty_str(repository_ctx),
+            rules_license_import_statement = _get_rules_license_import_statement_or_empty_str(repository_ctx),
         ),
         executable = False,
     )
@@ -1684,6 +1719,7 @@ pinned_coursier_fetch = repository_rule(
         "resolver_extra_dependencies": attr.label_list(default = []),
         # Use @@// to refer to the main repo with Bzlmod.
         "_workspace_label": attr.label(default = ("@@" if str(Label("//:invalid")).startswith("@@") else "@") + "//does/not:exist"),
+        "license_json": attr.label(doc = "JSON representing rules_license necessary metadata for applying licenses to imported artifacts"),
     },
     environ = [
         "HOME",
@@ -1756,6 +1792,7 @@ coursier_fetch = repository_rule(
         ),
         "ignore_empty_files": attr.bool(default = False, doc = "Treat jars that are empty as if they were not found."),
         "additional_coursier_options": attr.string_list(doc = "Additional options that will be passed to coursier."),
+        "license_json": attr.label(doc = "JSON representing rules_license necessary metadata for applying licenses to imported artifacts"),
         "pinned_repo_name": attr.string(
             doc = "Name of the corresponding pinned repo for this repo. Presence implies that this is an unpinned repo.",
             mandatory = False,

@@ -107,7 +107,8 @@ def _generate_target(
         testonly_artifacts,
         exclusions,
         default_visibilities,
-        artifact):
+        artifact,
+        license_info):
     to_return = []
     simple_coord = strip_packaging_and_classifier_and_version(artifact["coordinates"])
     target_label = escape(simple_coord)
@@ -259,13 +260,23 @@ copy_file(
             target_import_string.append("\t\t\"maven_exclusion=%s\"," % exclusion)
     target_import_string.append("\t],")
 
+    # Collect license target names for this artifact to include in applicable_licenses.
+    # Use stripped coordinates (without packaging/classifier suffix like @aar) to match license_info keys.
+    # License target names are prefixed with the target_label to ensure uniqueness across artifacts.
+    license_coordinates = strip_packaging_and_classifier(artifact["coordinates"])
+    license_target_names = []
+    if license_coordinates in license_info:
+        for license in license_info[license_coordinates]:
+            license_target_names.append("%s_%s" % (target_label, license["name"]))
+
     if packaging == "jar":
         target_import_string.append("\tmaven_coordinates = \"%s\"," % coordinates)
         if len(artifact["urls"]):
             target_import_string.append("\tmaven_url = \"%s\"," % maven_url)
 
         package_metadata_name = "%s_package_metadata" % target_label
-        target_import_string.append("\tapplicable_licenses = [\":{}\"],".format(package_metadata_name))
+        applicable = ["\":%s\"" % package_metadata_name] + ["\":%s\"" % l for l in license_target_names]
+        target_import_string.append("\tapplicable_licenses = [\n%s\n\t]," % "\n".join(["\t\t%s," % a for a in applicable]))
         to_return.append("""
 package_metadata(
     name = {package_metadata_name},
@@ -282,7 +293,8 @@ package_metadata(
 
         package_info_name = "%s_package_info" % target_label
         package_metadata_name = "%s_package_metadata" % target_label
-        target_import_string.append("\tapplicable_licenses = [\n\t\t\":{}\",\n\t\t\":{}\",\n\t],".format(package_info_name, package_metadata_name))
+        applicable = ["\":%s\"" % package_info_name, "\":%s\"" % package_metadata_name] + ["\":%s\"" % l for l in license_target_names]
+        target_import_string.append("\tapplicable_licenses = [\n%s\n\t]," % "\n".join(["\t\t%s," % a for a in applicable]))
         to_return.append("""
 package_info(
     name = {name},
@@ -394,7 +406,7 @@ package_metadata(
 
     to_return.append("\n".join(target_import_string))
 
-    # 10. Create a versionless alias target
+    # 11. Create a versionless alias target
     #
     # alias(
     #   name = "org_hamcrest_hamcrest_library_1_3",
@@ -420,7 +432,23 @@ processor_class = "{processor_class}",
             ),
         )
 
-    # 11. If using maven_install.json, use a genrule to copy the file from the http_file
+    # 12. If there is a corresponding license for the artifact, create a license target.
+    # https://github.com/bazelbuild/rules_license/blob/main/rules/providers.bzl#L26
+    # license(
+    #   name = "LICENSE-org_hamcrest_hamcrest-BSD-3-Clause-Clear",
+    #   copyright_notice = "Copyright 2018",
+    #   license_kinds = [
+    #     "@rules_license//licenses/spdx:BSD-3-Clause-Clear",
+    #   ],
+    #   license_text = "@//compliance/licenses:LICENSE-SPDX-BSD-3-Clause-Clear.txt",
+    #   package_name = "Hamcrest"
+    # )
+    if license_coordinates in license_info:
+        for license in license_info[license_coordinates]:
+            to_return.append("license(\n\tname = \"%s\",\n\tcopyright_notice = \"%s\",\n\tlicense_kinds = %s,\n\tlicense_text = \"%s\",\n\tpackage_name = \"%s\",\n)" %
+                             ("%s_%s" % (target_label, license["name"]), license["copyright_notice"], license["license_kinds"], license["license_text"], license["package_name"]))
+
+    # 13. If using maven_install.json, use a genrule to copy the file from the http_file
     # repository into this repository.
     #
     # genrule(
@@ -439,7 +467,7 @@ processor_class = "{processor_class}",
 # tree.
 #
 # Made function public for testing.
-def _generate_imports(repository_ctx, dependencies, explicit_artifacts, neverlink_artifacts, testonly_artifacts, exclusions, override_targets, override_target_visibilities, skip_maven_local_dependencies):
+def _generate_imports(repository_ctx, dependencies, explicit_artifacts, neverlink_artifacts, testonly_artifacts, exclusions, override_targets, override_target_visibilities, skip_maven_local_dependencies, license_info):
     repository_urls = [json.decode(repository)["repo_url"] for repository in repository_ctx.attr.repositories]
 
     # The list of java_import/aar_import declaration strings to be joined at the end
@@ -550,6 +578,7 @@ def _generate_imports(repository_ctx, dependencies, explicit_artifacts, neverlin
                 exclusions,
                 default_visibilities,
                 raw_artifact,
+                license_info,
             ))
 
         elif artifact_path != None and packaging != "pom":
@@ -566,6 +595,7 @@ def _generate_imports(repository_ctx, dependencies, explicit_artifacts, neverlin
                 exclusions,
                 default_visibilities,
                 artifact,
+                license_info,
             ))
         else:  # artifact_path == None or packaging == "pom":
             # Special case for certain artifacts that only come with a POM file.

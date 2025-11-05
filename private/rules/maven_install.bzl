@@ -29,7 +29,8 @@ def maven_install(
         repin_instructions = None,
         ignore_empty_files = False,
         resolver_extra_dependencies = [],
-        additional_coursier_options = []):
+        additional_coursier_options = [],
+        license_json = None):
     """Resolves and fetches artifacts transitively from Maven repositories.
 
     This macro runs a repository rule that invokes the Coursier CLI to resolve
@@ -83,6 +84,7 @@ def maven_install(
       ignore_empty_files: Treat jars that are empty as if they were not found.
       resolver_extra_dependencies: Jars or libraries to add to the resolver classpath (such as custom MetadataService or DownloadService SPI implementations).
       additional_coursier_options: Additional options that will be passed to coursier.
+      license_json: An optional JSON file containing a mapping of maven coordinate (`group:artifact:version`) -> rules_license: LicenseInfo attributes
     """
     if resolver != "coursier" and not maven_install_json:
         fail("Only the coursier resolver supports build time resolution. Please set `maven_install_json`. An empty file will work.")
@@ -149,6 +151,7 @@ def maven_install(
             duplicate_version_warning = duplicate_version_warning,
             ignore_empty_files = ignore_empty_files,
             additional_coursier_options = additional_coursier_options,
+            license_json = license_json,
         )
 
     else:
@@ -182,4 +185,5 @@ def maven_install(
             repin_instructions = repin_instructions,
             # Extra arguments only used for hash generation
             excluded_artifacts = excluded_artifacts_json_strings,
+            license_json = license_json,
         )

@@ -85,8 +85,6 @@ def unpack_coordinates(coords):
         if pieces[2] in SUPPORTED_PACKAGING_TYPES:
             packaging = pieces[2]
             version = pieces[3]
-            rewritten = "%s:%s:%s@%s" % (group, artifact, version, packaging)
-            print("Assuming %s should be interpreted as %s" % (coords, rewritten))
             return struct(group = group, artifact = artifact, packaging = packaging, version = version, classifier = None)
 
         # We could still be in one of `g:a:p:v` or `g:a:v:c`, but it's likely the latter. I do not

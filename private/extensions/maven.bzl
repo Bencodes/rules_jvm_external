@@ -48,6 +48,7 @@ install = tag_class(
 
         # Actual artifacts and overrides
         "artifacts": attr.string_list(doc = "Maven artifact tuples, in `artifactId:groupId:version` format", allow_empty = True),
+        "license_json": attr.label(doc = "License file", default = None),
         "boms": attr.string_list(doc = "Maven BOM tuples, in `artifactId:groupId:version` format", allow_empty = True),
         "exclusions": attr.string_list(doc = "Maven artifact tuples, in `artifactId:groupId` format", allow_empty = True),
 
@@ -797,6 +798,7 @@ def maven_impl(mctx):
                 repo["resolver"] = install.resolver
                 repo["resolver_extra_dependencies"] = install.resolver_extra_dependencies
                 repo["strict_visibility"] = install.strict_visibility
+                repo["license_json"] = install.license_json
                 if len(install.repositories):
                     mapped_repos = []
                     for repository in parse.parse_repository_spec_list(install.repositories):
@@ -863,6 +865,7 @@ def maven_impl(mctx):
                 duplicate_version_warning = repo.get("duplicate_version_warning"),
                 ignore_empty_files = repo.get("ignore_empty_files"),
                 additional_coursier_options = repo.get("additional_coursier_options"),
+                license_json = repo.get("license_json"),
             )
         else:
             workspace_prefix = "@@"
@@ -930,6 +933,7 @@ def maven_impl(mctx):
                 duplicate_version_warning = repo.get("duplicate_version_warning"),
                 excluded_artifacts = excluded_artifacts_json,
                 repin_instructions = repo.get("repin_instructions"),
+                license_json = repo.get("license_json"),
             )
 
             if repo.get("generate_compat_repositories"):
